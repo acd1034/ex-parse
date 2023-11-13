@@ -89,3 +89,56 @@ TEST_CASE("tokenize", "[tokenize]") {
     }
   }
 }
+
+TEST_CASE("parse", "[parse]") {
+  {
+    std::string_view in = "Const()";
+    ns::Tokenizer it(in);
+    auto result = ns::parse_expr(it);
+    CHECK(result);
+    auto funcall = std::get_if<ns::FunCall>(&*result);
+    CHECK(funcall);
+    CHECK(funcall->name.compare("Const") == 0);
+    CHECK(funcall->args.empty());
+  }
+  {
+    std::string_view in = "Add(Const(), Const())";
+    ns::Tokenizer it(in);
+    auto result = ns::parse_expr(it);
+    CHECK(result);
+    auto funcall = std::get_if<ns::FunCall>(&*result);
+    CHECK(funcall);
+    CHECK(funcall->name.compare("Add") == 0);
+    CHECK(funcall->args.size() == 2);
+    for (const auto& expr2 : funcall->args) {
+      auto funcall2 = std::get_if<ns::FunCall>(&expr2);
+      CHECK(funcall2);
+      CHECK(funcall2->name.compare("Const") == 0);
+      CHECK(funcall2->args.empty());
+    }
+  }
+  {
+    std::string_view in = "Ident";
+    ns::Tokenizer it(in);
+    auto result = ns::parse_expr(it);
+    CHECK(result);
+    auto ident = std::get_if<ns::ASTIdent>(&*result);
+    CHECK(ident);
+    CHECK(ident->name.compare("Ident") == 0);
+  }
+  {
+    std::string_view in = "Add(Ident, Ident)";
+    ns::Tokenizer it(in);
+    auto result = ns::parse_expr(it);
+    CHECK(result);
+    auto funcall = std::get_if<ns::FunCall>(&*result);
+    CHECK(funcall);
+    CHECK(funcall->name.compare("Add") == 0);
+    CHECK(funcall->args.size() == 2);
+    for (const auto& expr2 : funcall->args) {
+      auto ident2 = std::get_if<ns::ASTIdent>(&expr2);
+      CHECK(ident2);
+      CHECK(ident2->name.compare("Ident") == 0);
+    }
+  }
+}

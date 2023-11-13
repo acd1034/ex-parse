@@ -12,7 +12,7 @@ endif()
 
 # This interface adds compile options to how the tests are run
 add_library(IrisTestsConfig INTERFACE)
-target_compile_features(IrisTestsConfig INTERFACE cxx_std_20)
+target_compile_features(IrisTestsConfig INTERFACE cxx_std_23)
 set_target_properties(IrisTestsConfig PROPERTIES
   CXX_STANDARD_REQUIRED ON
   CXX_EXTENSIONS OFF
