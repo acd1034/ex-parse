@@ -141,4 +141,11 @@ TEST_CASE("parse", "[parse]") {
       CHECK(ident2->name.compare("Ident") == 0);
     }
   }
+  {
+    std::string_view in = "42";
+    ns::Tokenizer it(in);
+    auto result = ns::parse_expr(it);
+    CHECK_FALSE(result);
+    CHECK(result.error().msg.starts_with("unexpected"));
+  }
 }

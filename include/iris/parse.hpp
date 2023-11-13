@@ -37,6 +37,45 @@ namespace ns {
   };
   using Token = std::variant<Ident, Punct, Eof, Invalid>;
 
+  // variant visit: if std::getif | switch index * variant_alternative_index_v |
+  // overloaded
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+} // namespace ns
+
+template <>
+struct std::formatter<ns::Token> {
+  constexpr auto parse(std::format_parse_context& ctx)
+      -> decltype(ctx.begin()) {
+    auto it = ctx.begin();
+    if (it != ctx.end() and *it != '}') {
+      throw std::format_error{"invalid format"};
+    }
+    return it;
+  }
+
+  auto format(const ns::Token& token, auto& ctx) const -> decltype(ctx.out()) {
+    auto out = ctx.out();
+
+    // clang-format off
+    auto fn = ns::overloaded{
+      [out](const ns::Ident& ident) { return std::format_to(out, "Ident(\"{}\")", ident.data); },
+      [out](const ns::Punct& punct) { return std::format_to(out, "Punct(\"{}\")", punct.data); },
+      [out](const ns::Eof&) { return std::format_to(out, "Eof"); },
+      [out](const ns::Invalid& invalid) { return std::format_to(out, "Invalid(\"{}\")", invalid.data); }
+    };
+    out = std::visit(fn, token);
+    // clang-format on
+
+    return out;
+  }
+};
+
+namespace ns {
   inline constexpr auto isspace = [](char c) -> bool {
     return std::isspace(static_cast<unsigned char>(c));
   };
@@ -174,7 +213,8 @@ namespace ns {
       ++it;
       return std::move(*ident);
     } else {
-      return std::unexpected{Error{"unexpected token, expecting identifier"}};
+      return std::unexpected{Error{
+          std::format("unexpected token `{}`, expecting identifier", tok)}};
     }
   }
 
@@ -185,7 +225,8 @@ namespace ns {
       ++it;
       return std::move(*p);
     } else {
-      return std::unexpected{Error{"unexpected token, expecting punctuator"}};
+      return std::unexpected{Error{std::format(
+          "unexpected token `{}`, expecting punctuator `\"{}\"`", tok, punct)}};
     }
   }
 
@@ -195,7 +236,8 @@ namespace ns {
       ++it;
       return std::move(*e);
     } else {
-      return std::unexpected{Error{"unexpected token, expecting EOF"}};
+      return std::unexpected{
+          Error{std::format("unexpected token `{}`, expecting EOF", tok)}};
     }
   }
 
