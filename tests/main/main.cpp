@@ -94,7 +94,7 @@ TEST_CASE("parse", "[parse]") {
   {
     std::string_view in = "Const()";
     ns::Tokenizer it(in);
-    auto result = ns::parse_expr(it);
+    auto result = ns::parse_program(it);
     CHECK(result);
     auto funcall = std::get_if<ns::FunCall>(&*result);
     CHECK(funcall);
@@ -104,7 +104,7 @@ TEST_CASE("parse", "[parse]") {
   {
     std::string_view in = "Add(Const(), Const())";
     ns::Tokenizer it(in);
-    auto result = ns::parse_expr(it);
+    auto result = ns::parse_program(it);
     CHECK(result);
     auto funcall = std::get_if<ns::FunCall>(&*result);
     CHECK(funcall);
@@ -120,31 +120,39 @@ TEST_CASE("parse", "[parse]") {
   {
     std::string_view in = "Ident";
     ns::Tokenizer it(in);
-    auto result = ns::parse_expr(it);
+    auto result = ns::parse_program(it);
     CHECK(result);
-    auto ident = std::get_if<ns::ASTIdent>(&*result);
+    auto ident = std::get_if<ns::Variable>(&*result);
     CHECK(ident);
     CHECK(ident->name.compare("Ident") == 0);
   }
   {
     std::string_view in = "Add(Ident, Ident)";
     ns::Tokenizer it(in);
-    auto result = ns::parse_expr(it);
+    auto result = ns::parse_program(it);
     CHECK(result);
     auto funcall = std::get_if<ns::FunCall>(&*result);
     CHECK(funcall);
     CHECK(funcall->name.compare("Add") == 0);
     CHECK(funcall->args.size() == 2);
     for (const auto& expr2 : funcall->args) {
-      auto ident2 = std::get_if<ns::ASTIdent>(&expr2);
+      auto ident2 = std::get_if<ns::Variable>(&expr2);
       CHECK(ident2);
       CHECK(ident2->name.compare("Ident") == 0);
     }
   }
+  // ----- fail tests -----
   {
     std::string_view in = "42";
     ns::Tokenizer it(in);
-    auto result = ns::parse_expr(it);
+    auto result = ns::parse_program(it);
+    CHECK_FALSE(result);
+    CHECK(result.error().msg.starts_with("unexpected"));
+  }
+  {
+    std::string_view in = "ast 42";
+    ns::Tokenizer it(in);
+    auto result = ns::parse_program(it);
     CHECK_FALSE(result);
     CHECK(result.error().msg.starts_with("unexpected"));
   }
