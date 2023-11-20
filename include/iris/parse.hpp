@@ -99,15 +99,31 @@ struct std::formatter<ns::Token> {
      */
 
     // clang-format off
-    /* if (auto ident = std::get_if<ns::Ident>(&token)) {
+    if (auto ident = std::get_if<ns::Ident>(&token))
       out = std::format_to(out, "Ident(\"{}\")", ident->data);
-    } else if (auto punct = std::get_if<ns::Punct>(&token)) {
+    else if (auto punct = std::get_if<ns::Punct>(&token))
       out = std::format_to(out, "Punct(\"{}\")", punct->data);
-    } else if (std::get_if<ns::Eof>(&token)) {
+    else if (std::get_if<ns::Eof>(&token))
       out = std::format_to(out, "Eof");
-    } else if (auto invalid = std::get_if<ns::Invalid>(&token)) {
+    else if (auto invalid = std::get_if<ns::Invalid>(&token))
       out = std::format_to(out, "Invalid(\"{}\")", invalid->data);
-    } else {
+    else
+      std::unreachable();
+
+    /* switch (token.index()) {
+      case 0:
+        out = std::format_to(out, "Ident(\"{}\")", std::get<0>(token).data);
+        break;
+      case 1:
+        out = std::format_to(out, "Punct(\"{}\")", std::get<1>(token).data);
+        break;
+      case 2:
+        out = std::format_to(out, "Eof");
+        break;
+      case 3:
+        out = std::format_to(out, "Invalid(\"{}\")", std::get<3>(token).data);
+        break;
+      default:
       std::unreachable();
     } */
 
@@ -128,6 +144,27 @@ struct std::formatter<ns::Token> {
         std::unreachable();
     } */
 
+    /* struct fn {
+      decltype(ctx.out()) out;
+      auto operator()(const ns::Ident& ident) { return std::format_to(out, "Ident(\"{}\")", ident.data); }
+      auto operator()(const ns::Punct& punct) { return std::format_to(out, "Punct(\"{}\")", punct.data); }
+      auto operator()(const ns::Eof&) { return std::format_to(out, "Eof"); }
+      auto operator()(const ns::Invalid& invalid) { return std::format_to(out, "Invalid(\"{}\")", invalid.data); }
+    };
+    out = std::visit(fn{out}, token); */
+    /* auto fn = [out](const auto& tok) {
+      if constexpr (ns::similar_to<decltype(tok), ns::Ident>)
+        return std::format_to(out, "Ident(\"{}\")", tok.data);
+      else if constexpr (ns::similar_to<decltype(tok), ns::Punct>)
+        return std::format_to(out, "Punct(\"{}\")", tok.data);
+      else if constexpr (ns::similar_to<decltype(tok), ns::Eof>)
+        return std::format_to(out, "Eof");
+      else if constexpr (ns::similar_to<decltype(tok), ns::Invalid>)
+        return std::format_to(out, "Invalid(\"{}\")", tok.data);
+      else
+        std::unreachable();
+    };
+    out = std::visit(fn, token); */
     auto fn = ns::overloaded{
       [out](const ns::Ident& ident) { return std::format_to(out, "Ident(\"{}\")", ident.data); },
       [out](const ns::Punct& punct) { return std::format_to(out, "Punct(\"{}\")", punct.data); },
@@ -135,6 +172,12 @@ struct std::formatter<ns::Token> {
       [out](const ns::Invalid& invalid) { return std::format_to(out, "Invalid(\"{}\")", invalid.data); }
     };
     out = std::visit(fn, token);
+    /* out = token.visit(ns::overloaded{
+      [out](const ns::Ident& ident) { return std::format_to(out, "Ident(\"{}\")", ident.data); },
+      [out](const ns::Punct& punct) { return std::format_to(out, "Punct(\"{}\")", punct.data); },
+      [out](const ns::Eof&) { return std::format_to(out, "Eof"); },
+      [out](const ns::Invalid& invalid) { return std::format_to(out, "Invalid(\"{}\")", invalid.data); }
+    }); */
     // clang-format on
 
     return out;
@@ -179,8 +222,7 @@ namespace ns {
     return {Invalid{input.substr(0, 1)}, input.substr(1)};
   }
 
-  struct Tokenizer {
-  private:
+  class Tokenizer {
     Token token_{};
     std::string_view input_{};
 
@@ -215,11 +257,37 @@ namespace ns {
 
   static_assert(std::forward_iterator<Tokenizer>);
 
+  // NOTE: std::iterator_interface
+  /* class Tokenizer
+      : std::iterator_interface<std::forward_iterator_tag, Token, Token> {
+    Token token_{};
+    std::string_view input_{};
+
+  public:
+    Tokenizer() = default;
+    explicit Tokenizer(std::string_view input) {
+      std::tie(token_, input_) = tokenize(input);
+    }
+    value_type operator*() const {
+      return token_;
+    }
+    Tokenizer& operator++() {
+      std::tie(token_, input_) = tokenize(input_);
+      return *this;
+    }
+    friend bool operator==(const Tokenizer&, const Tokenizer&) = default;
+  }; */
+
   // ----- parse -----
 
 // NOTE: Try Macro | try?
 // BOOST_LEAF_ASSIGN:
-// https://www.boost.org/doc/libs/1_75_0/libs/leaf/doc/html/index.html#BOOST_LEAF_ASSIGN
+// https://www.boost.org/doc/libs/1_83_0/libs/leaf/doc/html/index.html#BOOST_LEAF_ASSIGN
+// BOOST_LEAF_AUTO(var, result); は以下のように展開される
+// auto&& <<temp>> = result;
+// if (not <<temp>>)
+//   return <<temp>>.error();
+// auto var = *std::forward<decltype(<<temp>>)>(<<temp>>);
 // BOOST_OUTCOME_TRY:
 // https://boostorg.github.io/outcome/tutorial/essential/result/try.html
 // try?:
@@ -377,7 +445,7 @@ namespace ns {
     Token tok = *it;
     if (auto ident = std::get_if<Ident>(&tok)) {
       ++it;
-      return std::move(*ident);
+      return *ident;
     } else {
       return std::unexpected{Error{
           std::format("unexpected token `{}`, expecting identifier", tok)}};
@@ -388,61 +456,69 @@ namespace ns {
   std::expected<Expr, Error> parse_variable(Tokenizer& it) {
     auto name = parse_ident(it);
     if (name)
-      return Expr(Variable{std::move(name->data)});
+      return Expr(Variable{name->data});
     else
-      return std::unexpected{std::move(name.error())};
+      return std::unexpected{name.error()};
   }
   // fun_call = IDENT "(" fun_args
-  std::expected<Expr, Error> parse_expr_(Tokenizer& it) {
+  /* std::expected<Expr, Error> parse_fun_call(Tokenizer& it) {
     auto name = parse_ident(it);
     if (not name)
-      return std::unexpected{std::move(name.error())};
+      return std::unexpected{name.error()};
 
-    auto _p = expect_punct(it, "(");
+    auto _p = parse_punct(it, "(");
     if (not _p)
-      return std::unexpected{std::move(_p.error())};
+      return std::unexpected{_p.error()};
 
     auto args = parse_fun_args(it);
-    if (args)
-      return Expr(FunCall{std::move(name->data), std::move(*args)});
-    else
-      return std::unexpected{std::move(args.error())};
-  }
+    if (not args)
+      return std::unexpected{args.error()};
+
+    return Expr(FunCall{name->data, *args});
+  } */
+  /* std::expected<Expr, Error> parse_fun_call(Tokenizer& it) {
+    NS_EXPECTED_TRY(name, parse_ident(it));
+    NS_EXPECTED_TRY(_p, parse_punct(it, "("));
+    NS_EXPECTED_TRY(args, parse_fun_args(it));
+    return Expr(FunCall{name.data, args});
+  } */
+  /* std::expected<Expr, Error> parse_fun_call(Tokenizer& it) {
+    Ident name = parse_ident(it).try?;
+    parse_punct(it, "(").try?;
+    std::vector<Expr> args = parse_fun_args(it).try?;
+    return Expr(FunCall{name.data, args});
+  } */
 
   // ----- count_fun_call -----
 
   // NOTE: 再帰的なvisitor
+  // 1. struct
+  // clang-format off
   int count_fun_call(const Expr& expr) {
-    // 1. struct
     struct fn {
       int operator()(const FunCall& funcall) const {
         int count = 1;
-        for (const auto& arg : funcall.args) {
+        for (const auto& arg : funcall.args)
           count += std::visit(*this, arg);
-        }
         return count;
       }
-      int operator()(const Variable&) const {
-        return 0;
-      }
+      int operator()(const Variable&) const { return 0; }
     };
     return std::visit(fn{}, expr);
-
-    // 2. lambda + if constexpr
-    // 自己再帰するラムダ式 https://yohhoy.hatenadiary.jp/entry/20211025/p1
-    /* constexpr auto fn = [](this const auto& self, const auto& expr) {
+  }
+  // 2. lambda + if constexpr
+  /* int count_fun_call(const Expr& expr) {
+    constexpr auto fn = [](this const auto& self, const auto& expr) {
       if constexpr (similar_to<decltype(expr), FunCall>) {
         int count = 1;
-        for (const auto& arg : funcall.args) {
+        for (const auto& arg : funcall.args)
           count += std::visit(self, arg);
-        }
         return count;
-      } else if constexpr (similar_to<decltype(expr), Variable>) {
+      } else if constexpr (similar_to<decltype(expr), Variable>)
         return 0;
-      } else {
+      else
         std::unreachable();
-      }
     };
-    return std::visit(fn, expr); */
-  }
+    return std::visit(fn, expr);
+  } */
 } // namespace ns
