@@ -21,7 +21,7 @@ namespace ns {
   /// similar_to
   template <class T, class U>
   concept similar_to =
-      std::same_as<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;
+    std::same_as<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;
 
   template <std::size_t I, class T>
   struct indexed {};
@@ -34,7 +34,7 @@ namespace ns {
 
   template <class T, std::size_t I>
   std::integral_constant<std::size_t, I> get_index(
-      const indexed<I, T>&); // undefined
+    const indexed<I, T>&); // undefined
 
   /// variant_alternative_index
   template <class T, class Variant>
@@ -42,16 +42,16 @@ namespace ns {
 
   template <class T, class Variant>
   struct variant_alternative_index<T, const Variant>
-      : variant_alternative_index<T, Variant> {};
+    : variant_alternative_index<T, Variant> {};
 
   template <class T, class... Ts>
   struct variant_alternative_index<T, std::variant<Ts...>>
-      : decltype(get_index<T>(
-            indexer<std::index_sequence_for<Ts...>, Ts...>{})) {};
+    : decltype(get_index<T>(indexer<std::index_sequence_for<Ts...>, Ts...>{})) {
+  };
 
   template <class T, class Variant>
   inline constexpr std::size_t variant_alternative_index_v =
-      variant_alternative_index<T, Variant>::value;
+    variant_alternative_index<T, Variant>::value;
 
   /// overloaded
   template <class... Ts>
@@ -79,7 +79,7 @@ namespace ns {
 template <>
 struct std::formatter<ns::Token> {
   constexpr auto parse(std::format_parse_context& ctx)
-      -> decltype(ctx.begin()) {
+    -> decltype(ctx.begin()) {
     auto it = ctx.begin();
     if (it != ctx.end() and *it != '}') {
       throw std::format_error{"invalid format"};
@@ -292,13 +292,13 @@ namespace ns {
 // https://boostorg.github.io/outcome/tutorial/essential/result/try.html
 // try?:
 // https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2561r2.html
-#define NS_EXPECTED_TRY_IMPL(var, result)                                      \
-  auto&& ns_temporary##var = (result);                                         \
-  if (not ns_temporary##var)                                                   \
-    return std::unexpected{                                                    \
-        std::forward<decltype(ns_temporary##var)>(ns_temporary##var).error()}; \
-  [[maybe_unused]] auto&& var =                                                \
-      *std::forward<decltype(ns_temporary##var)>(ns_temporary##var)
+#define NS_EXPECTED_TRY_IMPL(var, result)                                    \
+  auto&& ns_temporary##var = (result);                                       \
+  if (not ns_temporary##var)                                                 \
+    return std::unexpected{                                                  \
+      std::forward<decltype(ns_temporary##var)>(ns_temporary##var).error()}; \
+  [[maybe_unused]] auto&& var =                                              \
+    *std::forward<decltype(ns_temporary##var)>(ns_temporary##var)
 
 #define NS_EXPECTED_TRY(var, result) NS_EXPECTED_TRY_IMPL(var, result)
 
@@ -363,8 +363,8 @@ namespace ns {
       ++it;
       return std::move(*ident);
     } else {
-      return std::unexpected{Error{
-          std::format("unexpected token `{}`, expecting identifier", tok)}};
+      return std::unexpected{
+        Error{std::format("unexpected token `{}`, expecting identifier", tok)}};
     }
   }
 
@@ -376,7 +376,7 @@ namespace ns {
       return std::move(*p);
     } else {
       return std::unexpected{Error{std::format(
-          "unexpected token `{}`, expecting punctuator `\"{}\"`", tok, punct)}};
+        "unexpected token `{}`, expecting punctuator `\"{}\"`", tok, punct)}};
     }
   }
 
@@ -387,7 +387,7 @@ namespace ns {
       return std::move(*e);
     } else {
       return std::unexpected{
-          Error{std::format("unexpected token `{}`, expecting EOF", tok)}};
+        Error{std::format("unexpected token `{}`, expecting EOF", tok)}};
     }
   }
 
@@ -447,8 +447,8 @@ namespace ns {
       ++it;
       return *ident;
     } else {
-      return std::unexpected{Error{
-          std::format("unexpected token `{}`, expecting identifier", tok)}};
+      return std::unexpected{
+        Error{std::format("unexpected token `{}`, expecting identifier", tok)}};
     }
   }
   // 2. std::expectedの処理
